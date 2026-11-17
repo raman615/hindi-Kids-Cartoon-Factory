@@ -1,0 +1,64 @@
+
+name: Daily Hindi Kids Cartoon
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Download Project
+        uses: actions/checkout@v4
+
+      - name: Install System Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender ffmpeg espeak-ng fonts-noto-core
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python Packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate Hindi Story
+        run: python engine/story_generator.py
+
+      - name: Generate 3D Scenes
+        run: blender -b -P engine/scene_generator.py
+
+      - name: Generate Hindi Voice
+        run: python engine/voice_generator.py
+
+      - name: Create Final Video
+        run: python engine/video_editor.py
+
+      - name: Upload to YouTube
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: python engine/youtube_upload.py
+
+      - name: Save Generated Video
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hindi-Kids-Cartoon-Video
+          path: |
+            output/hindi_kids_story.mp4
+            output/thumbnail.jpg
+            output/scripts/
+          if-no-files-found: warn
+          retention-days: 7
